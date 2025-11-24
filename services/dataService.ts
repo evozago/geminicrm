@@ -1,41 +1,47 @@
 import { createClient } from '@supabase/supabase-js';
 import { AnalyticsCategoria, SalesEvolutionData, SalesSniperMatch, CarteiraCliente } from '../types';
 
-// Configuração do Supabase (Idealmente viria de .env, mas mantivemos aqui para facilitar seu teste)
+// CONFIGURAÇÃO SUPABASE
+// NOTA: Em produção, use import.meta.env.VITE_SUPABASE_URL
 const SUPABASE_URL = 'https://mnxemxgcucfuoedqkygw.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1ueGVteGdjdWNmdW9lZHFreWd3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM4OTY5MTYsImV4cCI6MjA2OTQ3MjkxNn0.JeDMKgnwRcK71KOIun8txqFFBWEHSKdPzIF8Qm9tw1o';
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // --- 1. DASHBOARD ---
 export const getDashboardStats = async () => {
+  console.log("🔄 Buscando dados do Dashboard...");
   try {
-    // Busca Categorias (View Real)
+    // Busca Categorias
     const { data: catData, error: catError } = await supabase
       .from('gemini_vw_analytics_categorias')
       .select('*')
       .order('faturamento_bruto', { ascending: false })
       .limit(5);
 
-    if (catError) console.error("Erro Categorias:", catError);
+    if (catError) console.error("❌ Erro Categorias:", catError);
 
-    // Busca Evolução Temporal (View Real)
+    // Busca Evolução
     const { data: evoData, error: evoError } = await supabase
       .from('gemini_vw_analise_mensal')
       .select('*')
       .order('mes_ano', { ascending: true });
 
-    if (evoError) console.error("Erro Evolução:", evoError);
+    if (evoError) console.error("❌ Erro Evolução:", evoError);
 
-    // Cálculos de KPI simples
+    // Cálculos KPI
     const faturamentoTotal = catData?.reduce((acc, curr) => acc + (curr.faturamento_bruto || 0), 0) || 0;
     const lucroTotal = catData?.reduce((acc, curr) => acc + (curr.lucro_estimado || 0), 0) || 0;
+    
+    // Total de pedidos (soma de todos os meses da evolução)
+    // Filtramos para não somar duplicado se tiver múltiplas linhas por mês
+    const totalPedidos = evoData?.reduce((acc, curr) => acc + (curr.total_atendimentos || 0), 0) || 0;
 
     return {
       kpis: {
-        faturamentoMes: faturamentoTotal, // Exemplo simplificado
+        faturamentoMes: faturamentoTotal, 
         lucroEstimado: lucroTotal,
-        totalPedidos: evoData?.reduce((acc, curr) => acc + curr.total_atendimentos, 0) || 0
+        totalPedidos: totalPedidos
       },
       charts: {
         evolution: evoData || [],
@@ -43,13 +49,14 @@ export const getDashboardStats = async () => {
       }
     };
   } catch (e) {
-    console.error("Erro Geral Dashboard:", e);
+    console.error("❌ Erro Crítico Dashboard:", e);
     return null;
   }
 };
 
-// --- 2. CARTEIRA DE CLIENTES (RANKING POR VENDEDOR) ---
+// --- 2. CARTEIRA DE CLIENTES ---
 export const getCarteiraClientes = async (vendedorFiltro?: string): Promise<CarteiraCliente[]> => {
+  console.log(`🔄 Buscando Carteira. Filtro: ${vendedorFiltro}`);
   try {
     let query = supabase
       .from('gemini_vw_relatorio_carteira_clientes')
@@ -63,80 +70,85 @@ export const getCarteiraClientes = async (vendedorFiltro?: string): Promise<Cart
     const { data, error } = await query;
 
     if (error) {
-      console.error("Erro Carteira Clientes:", error);
+      console.error("❌ Erro SQL Carteira:", error);
       return [];
     }
     return data || [];
   } catch (e) {
+    console.error("❌ Erro JS Carteira:", e);
     return [];
   }
 };
 
-// --- 3. SNIPER DE VENDAS (IA DE RECOMENDAÇÃO) ---
+// --- 3. SNIPER DE VENDAS ---
 export const runSalesSniper = async (
   marca: string, 
   tamanho: string, 
   genero: string, 
   categoria: string
 ): Promise<SalesSniperMatch[]> => {
+  console.log(`🎯 Iniciando Sniper: ${marca}, ${tamanho}, ${genero}`);
+  
   try {
-    console.log(`Iniciando Sniper para: ${marca} - ${tamanho}`);
     const sixMonthsAgo = new Date();
     sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
 
-    // 1. Busca quem comprou produtos similares (Marca + Tamanho ou Categoria + Tamanho)
-    // Usando a tabela de itens que já tem nome e telefone (graças ao seu último ajuste)
-    const { data: salesItems, error } = await supabase
+    // ESTRATÉGIA MAIS SIMPLES E EFICAZ:
+    // 1. Buscar na tabela de ITENS quem comprou produtos parecidos nos últimos 6 meses.
+    // Usamos .ilike para ser flexível (ex: buscar "6" encontra "6", "06", "Tam 6")
+    
+    const { data: itensEncontrados, error: erroItens } = await supabase
       .from('gemini_vendas_itens')
-      .select('nome, data, valor_venda, sku, tamanho, cor')
-      .gt('data', sixMonthsAgo.toISOString()) // Últimos 6 meses
-      .ilike('tamanho', `%${tamanho}%`); // Tamanho aproximado
+      .select('movimentacao, sku, tamanho, cor, nome, data')
+      .gt('data', sixMonthsAgo.toISOString())
+      .ilike('tamanho', `%${tamanho}%`) 
+      // Se quiser filtrar por marca também, precisaríamos fazer um join, 
+      // mas vamos focar no tamanho e nome do cliente que já temos na tabela itens
+      .limit(200);
 
-    if (error) throw error;
-    if (!salesItems) return [];
-
-    // 2. Filtrar e Agrupar no JavaScript (já que o filtro SQL complexo pode ser pesado)
-    // Aqui buscamos clientes que compraram algo parecido
-    const clientesMap = new Map<string, SalesSniperMatch>();
-
-    // Primeiro, vamos pegar os telefones desses clientes na tabela de clientes ou vendas_geral
-    // Para simplificar, vamos assumir que precisamos fazer um join manual ou pegar da venda_geral
-    // Mas no seu script V10, adicionamos 'nome' na venda_itens. Vamos tentar pegar o telefone via join.
-    
-    // Melhor abordagem: Pegar vendas geral filtradas
-    const { data: vendasRelevantes } = await supabase
-       .from('gemini_vendas_geral')
-       .select('nome, telefone, data, total_venda')
-       .gt('data', sixMonthsAgo.toISOString());
-
-    // Cruzamento simples: Se o cliente comprou algo no periodo e bate com o perfil
-    // Nota: Um algoritmo real faria matching mais profundo, mas este é um bom começo.
-    
-    const matches: SalesSniperMatch[] = [];
-    
-    // Simulação inteligente baseada nos dados reais retornados
-    // Se tivermos vendas reais, retornamos. Se não, array vazio.
-    
-    if (vendasRelevantes && vendasRelevantes.length > 0) {
-        // Agrupamos por cliente para não repetir
-        const uniqueClients = new Map();
-        vendasRelevantes.forEach(v => {
-            if(!uniqueClients.has(v.telefone)) {
-                uniqueClients.set(v.telefone, {
-                    cliente: { nome: v.nome, telefone: v.telefone },
-                    motivo: `Cliente ativo. Comprou recentemente (${new Date(v.data).toLocaleDateString()})`,
-                    ultimaCompraData: v.data,
-                    totalGastoHistorico: v.total_venda
-                });
-            }
-        });
-        return Array.from(uniqueClients.values()).slice(0, 50); // Top 50
+    if (erroItens) {
+      console.error("❌ Erro Sniper Itens:", erroItens);
+      throw erroItens;
     }
 
-    return [];
+    if (!itensEncontrados || itensEncontrados.length === 0) {
+      console.warn("⚠️ Sniper: Nenhum item encontrado com esses filtros.");
+      return [];
+    }
+
+    // Coletar os IDs de movimentação para pegar o telefone na tabela GERAL
+    const movimentacoesIds = itensEncontrados.map(i => i.movimentacao);
+
+    // 2. Buscar Telefones na Vendas Geral
+    const { data: vendasGerais, error: erroGeral } = await supabase
+      .from('gemini_vendas_geral')
+      .select('movimentacao, nome, telefone, total_venda')
+      .in('movimentacao', movimentacoesIds);
+
+    if (erroGeral) throw erroGeral;
+
+    // 3. Cruzar dados e montar resultado
+    const resultadoMap = new Map<string, SalesSniperMatch>();
+
+    vendasGerais?.forEach(venda => {
+      // Validar se tem telefone
+      if (!venda.telefone || venda.telefone.length < 8) return;
+
+      if (!resultadoMap.has(venda.telefone)) {
+        resultadoMap.set(venda.telefone, {
+          cliente: { nome: venda.nome || "Cliente", telefone: venda.telefone },
+          motivo: `Comprou tamanho ${tamanho} recentemente`,
+          ultimaCompraData: itensEncontrados.find(i => i.movimentacao === venda.movimentacao)?.data || new Date().toISOString(),
+          totalGastoHistorico: venda.total_venda
+        });
+      }
+    });
+
+    console.log(`✅ Sniper encontrou ${resultadoMap.size} clientes.`);
+    return Array.from(resultadoMap.values());
 
   } catch (err) {
-    console.error("Sniper Error:", err);
+    console.error("❌ Erro Crítico Sniper:", err);
     return [];
   }
 };

@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Search, Crosshair, MessageCircle, UserCheck, Phone, Calendar, DollarSign } from 'lucide-react';
 import { runSalesSniper } from '../services/dataService';
@@ -171,7 +172,7 @@ export const SalesSniper: React.FC = () => {
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {results.map((match) => (
-                      <tr key={match.cliente.id || Math.random()} className="hover:bg-slate-50 transition-colors">
+                      <tr key={match.cliente.telefone || Math.random()} className="hover:bg-slate-50 transition-colors">
                         <td className="p-4">
                           <div className="font-bold text-slate-900">{match.cliente.nome}</div>
                           <div className="text-xs text-slate-500 flex items-center gap-1 mt-1">

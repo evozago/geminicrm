@@ -1,3 +1,6 @@
+// src/types.ts
+
+// Tabelas Base
 export interface Cliente {
   id: number;
   nome: string;
@@ -19,19 +22,9 @@ export interface Produto {
   quantidade_estoque: number;
 }
 
-export interface VendaItem {
-  movimentacao: string;
-  sku: string;
-  quantidade: number;
-  valor_venda: number;
-  data: string;
-  nome?: string;
-}
-
-// --- VIEWS DO SUPABASE (Ouro) ---
-
+// Views de Inteligência (Essenciais para o Dashboard)
 export interface AnalyticsCategoria {
-  categoria_produto: string; // Nome exato da coluna na View
+  categoria_produto: string; // Nome exato da coluna na View SQL
   qtd_pedidos: number;
   pecas_vendidas: number;
   faturamento_bruto: number;
@@ -46,16 +39,15 @@ export interface SalesEvolutionData {
   tipo_operacao: string;
 }
 
-// A Super View de Carteira de Clientes
 export interface CarteiraCliente {
   cliente: string;
-  vendedor_responsavel: string; // Quem mais vendeu
-  ultimo_vendedor: string;      // Quem atendeu por último
+  vendedor_responsavel: string;
+  ultimo_vendedor: string;
   total_gasto_acumulado: number;
   qtd_produtos_total: number;
   qtd_vendas: number;
   data_ultima_compra: string;
-  ultimas_preferencias: string; // "Lui Bambini (6), Momi (8)"
+  ultimas_preferencias: string;
 }
 
 export interface SalesSniperMatch {
