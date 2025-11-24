@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useMemo } from 'react';
 import { getCarteiraClientes } from '../services/dataService';
 import { CarteiraCliente } from '../types';
@@ -58,10 +57,6 @@ export const ClientPortfolio: React.FC = () => {
   // 2. Sort Data (Handling Grouping Logic)
   const sortedData = useMemo(() => {
     const sorted = [...filteredData].sort((a, b) => {
-      // If "Todos" is selected, we prioritize grouping by Vendor first, unless user explicitly changes sort
-      // However, for a true "Grouped by Seller" experience, we usually want Vendedor as primary sort.
-      // Let's respect the user's sortConfig, but if the user wants "Rank" (Total Gasto), we just sort by that.
-      
       const aValue = a[sortConfig.key];
       const bValue = b[sortConfig.key];
 
@@ -70,14 +65,13 @@ export const ClientPortfolio: React.FC = () => {
       return 0;
     });
 
-    // If grouping is essential when "Todos" is selected and no specific sort overrides it:
-    // For this requirement "It should be grouped by seller", we can enforce a secondary sort or 
-    // simply let the user sort. To strictly follow "Grouped by seller", we usually sort by Seller First.
     if (selectedVendedor === 'Todos' && sortConfig.key !== 'vendedor_responsavel') {
         return sorted.sort((a, b) => {
-             if (a.vendedor_responsavel < b.vendedor_responsavel) return -1;
-             if (a.vendedor_responsavel > b.vendedor_responsavel) return 1;
-             return 0; // If sellers are same, keep previous sort (e.g. Total Gasto)
+             const vendA = a.vendedor_responsavel || '';
+             const vendB = b.vendedor_responsavel || '';
+             if (vendA < vendB) return -1;
+             if (vendA > vendB) return 1;
+             return 0;
         });
     }
 
@@ -104,8 +98,8 @@ export const ClientPortfolio: React.FC = () => {
   };
 
   // Metrics for Top Cards
-  const totalFaturamento = filteredData.reduce((acc, curr) => acc + curr.total_gasto_acumulado, 0);
-  const top5Clients = [...filteredData].sort((a,b) => b.total_gasto_acumulado - a.total_gasto_acumulado).slice(0, 5);
+  const totalFaturamento = filteredData.reduce((acc, curr) => acc + (curr.total_gasto_acumulado || 0), 0);
+  const top5Clients = [...filteredData].sort((a,b) => (b.total_gasto_acumulado || 0) - (a.total_gasto_acumulado || 0)).slice(0, 5);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -154,10 +148,10 @@ export const ClientPortfolio: React.FC = () => {
                             <div className="relative z-10">
                                 <div className="font-bold text-slate-800 truncate" title={client.cliente}>{client.cliente}</div>
                                 <div className="text-emerald-600 font-bold text-sm mt-1">
-                                    {client.total_gasto_acumulado.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                    {(client.total_gasto_acumulado || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                                 </div>
                                 <div className="text-xs text-slate-500 mt-2">
-                                    {client.qtd_vendas} compras
+                                    {client.qtd_vendas || 0} compras
                                 </div>
                             </div>
                         </div>
@@ -216,7 +210,7 @@ export const ClientPortfolio: React.FC = () => {
               {loading ? (
                  <tr><td colSpan={8} className="p-8 text-center text-slate-500">Carregando dados...</td></tr>
               ) : paginatedData.length === 0 ? (
-                 <tr><td colSpan={8} className="p-8 text-center text-slate-500">Nenhum registro encontrado.</td></tr>
+                 <tr><td colSpan={8} className="p-8 text-center text-slate-500">Nenhum registro encontrado. Se houver erro de conexão, verifique o status na barra lateral.</td></tr>
               ) : (
                 paginatedData.map((client, index) => {
                   // Logic for Group Header
@@ -227,7 +221,7 @@ export const ClientPortfolio: React.FC = () => {
                         {showGroupHeader && (
                             <tr className="bg-indigo-50/50">
                                 <td colSpan={8} className="px-4 py-2 font-bold text-indigo-900 text-xs uppercase tracking-wider border-y border-indigo-100">
-                                    Carteira: {client.vendedor_responsavel}
+                                    Carteira: {client.vendedor_responsavel || 'Sem Vendedor'}
                                 </td>
                             </tr>
                         )}
@@ -236,27 +230,27 @@ export const ClientPortfolio: React.FC = () => {
                                 <div className="font-bold text-slate-900">{client.cliente}</div>
                             </td>
                             <td className="px-4 py-3 text-slate-500 whitespace-nowrap">
-                                {client.telefone}
+                                {client.telefone || '-'}
                             </td>
                              {selectedVendedor === 'Todos' && (
                                 <td className="px-4 py-3 text-slate-500">
-                                    {client.vendedor_responsavel}
+                                    {client.vendedor_responsavel || '-'}
                                 </td>
                             )}
                             <td className="px-4 py-3 text-right font-medium text-emerald-700">
-                                {client.total_gasto_acumulado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                {(client.total_gasto_acumulado || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                             </td>
                             <td className="px-4 py-3 text-center text-slate-600">
-                                {client.qtd_vendas}
+                                {client.qtd_vendas || 0}
                             </td>
                             <td className="px-4 py-3 text-center text-slate-600">
-                                {client.qtd_produtos}
+                                {client.qtd_produtos || 0}
                             </td>
                              <td className="px-4 py-3 text-center text-slate-600 text-xs">
-                                {new Date(client.ultima_compra_data).toLocaleDateString('pt-BR')}
+                                {client.ultima_compra_data ? new Date(client.ultima_compra_data).toLocaleDateString('pt-BR') : '-'}
                             </td>
                             <td className="px-4 py-3 text-xs text-slate-500 italic">
-                                {client.ultimas_preferencias}
+                                {client.ultimas_preferencias || 'Sem dados recentes'}
                             </td>
                         </tr>
                     </React.Fragment>
@@ -281,8 +275,6 @@ export const ClientPortfolio: React.FC = () => {
                      <ChevronLeft size={16} />
                  </button>
                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                    // Simple logic to show first 5 pages or sliding window could be added
-                    // For now, simple first few pages
                     let pNum = i + 1;
                     if (currentPage > 3 && totalPages > 5) pNum = currentPage - 2 + i;
                     if (pNum > totalPages) return null;

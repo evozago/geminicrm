@@ -1,10 +1,11 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Dashboard } from './components/Dashboard';
 import { SalesSniper } from './components/SalesSniper';
 import { ChurnAnalysis } from './components/ChurnAnalysis';
 import { ClientPortfolio } from './components/ClientPortfolio';
-import { LayoutDashboard, Target, Users, Menu, X, ShoppingBag, Briefcase } from 'lucide-react';
+import { LayoutDashboard, Target, Users, Menu, X, ShoppingBag, Briefcase, AlertTriangle, CheckCircle } from 'lucide-react';
+import { checkSupabaseConnection } from './services/dataService';
 
 enum View {
   DASHBOARD = 'dashboard',
@@ -16,6 +17,23 @@ enum View {
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>(View.DASHBOARD);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  
+  // System Status
+  const [connectionStatus, setConnectionStatus] = useState<'checking' | 'online' | 'error'>('checking');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    const check = async () => {
+      const result = await checkSupabaseConnection();
+      if (result.success) {
+        setConnectionStatus('online');
+      } else {
+        setConnectionStatus('error');
+        setErrorMessage(result.message || 'Erro desconhecido');
+      }
+    };
+    check();
+  }, []);
 
   const NavItem = ({ view, icon: Icon, label }: { view: View, icon: any, label: string }) => (
     <button
@@ -68,12 +86,33 @@ const App: React.FC = () => {
           </nav>
 
           <div className="mt-auto pt-6 border-t border-slate-100">
-             <div className="bg-gradient-to-br from-slate-900 to-slate-800 p-4 rounded-xl text-white">
-               <p className="text-xs font-medium text-slate-400 mb-1">Status do Sistema</p>
-               <div className="flex items-center gap-2">
-                 <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-                 <span className="text-sm font-semibold">Online • Supabase</span>
-               </div>
+             <div className={`p-4 rounded-xl text-white ${connectionStatus === 'error' ? 'bg-red-500' : 'bg-gradient-to-br from-slate-900 to-slate-800'}`}>
+               <p className="text-xs font-medium text-white/70 mb-1">Status do Sistema</p>
+               
+               {connectionStatus === 'checking' && (
+                 <div className="flex items-center gap-2">
+                   <div className="w-2 h-2 rounded-full bg-yellow-400 animate-pulse" />
+                   <span className="text-sm font-semibold">Conectando...</span>
+                 </div>
+               )}
+
+               {connectionStatus === 'online' && (
+                 <div className="flex items-center gap-2">
+                   <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+                   <span className="text-sm font-semibold">Online • Supabase</span>
+                 </div>
+               )}
+
+               {connectionStatus === 'error' && (
+                 <div className="flex flex-col gap-1">
+                   <div className="flex items-center gap-2">
+                     <AlertTriangle size={14} className="text-white" />
+                     <span className="text-sm font-bold">Erro de Conexão</span>
+                   </div>
+                   <span className="text-[10px] leading-tight opacity-90">{errorMessage?.slice(0, 40)}...</span>
+                 </div>
+               )}
+
              </div>
           </div>
         </div>
