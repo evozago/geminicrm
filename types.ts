@@ -1,4 +1,3 @@
-
 export interface Cliente {
   id: number;
   nome: string;
@@ -11,70 +10,60 @@ export interface Cliente {
 export interface Produto {
   sku: string;
   nome_produto: string;
-  categoria_produto: string; // Renamed from categoria
+  categoria_produto: string;
   marca: string;
   tamanho: string;
   cor: string;
   genero: string;
   valor_venda: number;
-  valor_custo: number;
-  quantidade_estoque: number; // Added
-}
-
-export interface VendaGeral {
-  movimentacao: number;
-  data: string;
-  nome: string; // Renamed from cliente_nome
-  telefone: string;
-  total_venda: number;
-  tipo_operacao: string; // Added (Venda simples, Troca, etc)
+  quantidade_estoque: number;
 }
 
 export interface VendaItem {
-  movimentacao: number;
+  movimentacao: string;
   sku: string;
   quantidade: number;
   valor_venda: number;
-  data: string; // Added
+  data: string;
+  nome?: string;
 }
 
-// Views / Aggregated Data Types
+// --- VIEWS DO SUPABASE (Ouro) ---
+
 export interface AnalyticsCategoria {
-  categoria: string;
-  faturamento_total: number;
-  quantidade_vendas: number;
-  lucro_total: number;
+  categoria_produto: string; // Nome exato da coluna na View
+  qtd_pedidos: number;
+  pecas_vendidas: number;
+  faturamento_bruto: number;
+  lucro_estimado: number;
+  preco_medio_peca: number;
 }
 
 export interface SalesEvolutionData {
-  mes: string;
-  vendas: number;
-  trocas: number;
+  mes_ano: string;
+  total_atendimentos: number;
+  faturamento_liquido_real: number;
+  tipo_operacao: string;
 }
 
-export interface RankingCliente {
-  cliente_nome: string;
-  telefone: string;
-  total_gasto: number;
-  ultima_compra: string; // ISO date
-  dias_sem_comprar: number;
+// A Super View de Carteira de Clientes
+export interface CarteiraCliente {
+  cliente: string;
+  vendedor_responsavel: string; // Quem mais vendeu
+  ultimo_vendedor: string;      // Quem atendeu por último
+  total_gasto_acumulado: number;
+  qtd_produtos_total: number;
+  qtd_vendas: number;
+  data_ultima_compra: string;
+  ultimas_preferencias: string; // "Lui Bambini (6), Momi (8)"
 }
 
 export interface SalesSniperMatch {
-  cliente: Cliente;
+  cliente: {
+    nome: string;
+    telefone: string;
+  };
   motivo: string;
   ultimaCompraData: string;
   totalGastoHistorico: number;
-  produtosComprados: string[];
-}
-
-export interface CarteiraCliente {
-  cliente: string; // Nome do cliente
-  telefone: string;
-  vendedor_responsavel: string; // Último vendedor
-  total_gasto_acumulado: number;
-  qtd_produtos: number;
-  qtd_vendas: number; // Quantidade de tickets/vendas
-  ultima_compra_data: string;
-  ultimas_preferencias: string; // String descritiva: "Lui Bambini (6), Momi (8)"
 }
