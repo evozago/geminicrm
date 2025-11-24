@@ -3,11 +3,12 @@ import { Cliente, Produto, VendaGeral, VendaItem, AnalyticsCategoria, SalesEvolu
 
 // Supabase Configuration
 const SUPABASE_URL = 'https://mnxemxgcucfuoedqkygw.supabase.co';
+// Using the ANON public key as requested. The service_role secret should not be used in the client.
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1ueGVteGdjdWNmdW9lZHFreWd3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM4OTY5MTYsImV4cCI6MjA2OTQ3MjkxNn0.JeDMKgnwRcK71KOIun8txqFFBWEHSKdPzIF8Qm9tw1o';
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-// --- MOCK DATA UPDATED TO SCHEMA ---
+// --- MOCK DATA FALLBACKS ---
 const MOCK_SALES_EVOLUTION: SalesEvolutionData[] = [
   { mes: '2023-09', vendas: 12500, trocas: 1200 },
   { mes: '2023-10', vendas: 15000, trocas: 800 },
@@ -37,39 +38,66 @@ const MOCK_RANKING_CLIENTES: RankingCliente[] = [
 
 export const getDashboardStats = async () => {
   try {
-    // 1. KPI: Current Month Sales
-    const startOfMonth = new Date();
-    startOfMonth.setDate(1);
-    startOfMonth.setHours(0, 0, 0, 0);
+    const today = new Date();
+    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    const sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+    sixMonthsAgo.setDate(1);
 
+    // Fetch sales for KPI (Current Month)
     const { data: currentMonthSales, error: salesError } = await supabase
       .from('gemini_vendas_geral')
-      .select('total_venda, tipo_operacao')
+      .select('total_venda, tipo_operacao, data')
       .gte('data', startOfMonth.toISOString());
 
+    if (salesError) console.error("Error fetching sales:", salesError);
+
+    // Calculate KPIs
     let faturamentoMes = 0;
     let totalPedidos = 0;
     
-    if (!salesError && currentMonthSales) {
+    if (currentMonthSales) {
       faturamentoMes = currentMonthSales
-        .filter(s => s.tipo_operacao === 'Venda simples')
+        .filter(s => s.tipo_operacao === 'Venda simples' || s.tipo_operacao === 'Venda')
         .reduce((sum, item) => sum + (item.total_venda || 0), 0);
       
       totalPedidos = currentMonthSales.length;
     } else {
-      // Fallback
+      // Fallback if DB empty/error
       faturamentoMes = 18500;
       totalPedidos = 142;
     }
 
-    // 2. Charts: Sales vs Exchanges Evolution (Last 6 Months)
-    // In a real app, we'd use a specific View or RPC. Here we simulate aggregating mocked data or fetching raw if available.
-    // We will use the MOCK_SALES_EVOLUTION for chart stability in this demo context if the specific view doesn't exist.
-    const { data: evolutionData, error: evError } = await supabase
-      .from('gemini_vw_analise_mensal') // Reusing existing view if compatible, or fallback
-      .select('*');
+    // 2. Charts: Sales vs Exchanges Evolution (Last 6 Months) - Manually Aggregating
+    // We aggregate directly from 'gemini_vendas_geral' to ensure we capture "Trocas" vs "Vendas" accurately
+    const { data: rawEvolutionData, error: evError } = await supabase
+      .from('gemini_vendas_geral')
+      .select('data, total_venda, tipo_operacao')
+      .gte('data', sixMonthsAgo.toISOString())
+      .order('data', { ascending: true });
 
-    const chartData = (evError || !evolutionData) ? MOCK_SALES_EVOLUTION : MOCK_SALES_EVOLUTION; // Prefer mock for specific layout "Sales vs Exchanges" unless view matches perfectly
+    let chartData: SalesEvolutionData[] = [];
+
+    if (!evError && rawEvolutionData && rawEvolutionData.length > 0) {
+      const grouped = rawEvolutionData.reduce((acc: any, curr) => {
+        const month = curr.data.substring(0, 7); // YYYY-MM
+        if (!acc[month]) acc[month] = { mes: month, vendas: 0, trocas: 0 };
+        
+        const isTroca = curr.tipo_operacao?.toLowerCase().includes('troca');
+        if (isTroca) {
+          acc[month].trocas += (curr.total_venda || 0);
+        } else {
+          acc[month].vendas += (curr.total_venda || 0);
+        }
+        return acc;
+      }, {});
+      
+      chartData = Object.values(grouped);
+      // Sort by month
+      chartData.sort((a: any, b: any) => a.mes.localeCompare(b.mes));
+    } else {
+      chartData = MOCK_SALES_EVOLUTION;
+    }
 
     // 3. Top Categories
     const { data: catData, error: catError } = await supabase
@@ -106,18 +134,22 @@ export const getRankingClientes = async (): Promise<RankingCliente[]> => {
     const { data, error } = await supabase
       .from('gemini_vw_ranking_clientes')
       .select('*')
-      .order('total_gasto', { ascending: false });
+      .order('total_gasto', { ascending: false })
+      .limit(50); // Limit to top 50 for performance
 
-    return data && !error ? data : MOCK_RANKING_CLIENTES;
+    if (error) {
+      console.error("Error fetching ranking:", error);
+      return MOCK_RANKING_CLIENTES;
+    }
+    return data && data.length > 0 ? data : MOCK_RANKING_CLIENTES;
   } catch (e) {
     return MOCK_RANKING_CLIENTES;
   }
 };
 
 /**
- * THE SALES SNIPER ALGORITHM (UPDATED)
+ * THE SALES SNIPER ALGORITHM
  * Criteria: Bought similar items in last 6 months.
- * Output: Name, Phone, Last Purchase, Total Spent.
  */
 export const runSalesSniper = async (
   marca: string, 
@@ -129,20 +161,23 @@ export const runSalesSniper = async (
     const sixMonthsAgo = new Date();
     sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
 
-    // 1. Find Historical SKUs matching criteria (Similar products bought in the past)
-    // We look for products of same Brand + Gender + (Size OR Category)
+    console.log(`Running Sniper: ${marca}, ${tamanho}, ${genero}, ${categoria}`);
+
+    // 1. Find Historical SKUs matching criteria (Similar products)
     const { data: similarProducts, error: prodError } = await supabase
       .from('gemini_produtos')
       .select('sku')
       .eq('marca', marca)
       .eq('genero', genero)
-      // We broaden search slightly to find relevant history: either same category OR same size
       .or(`tamanho.eq.${tamanho},categoria_produto.eq.${categoria}`);
 
     if (prodError) throw prodError;
     
-    // If no exact matches in catalog history, return empty or mock
-    if (!similarProducts || similarProducts.length === 0) return getMockSniperResult(marca, tamanho);
+    // Fallback Mock if no matching products in DB (for demo purposes if DB is empty)
+    if (!similarProducts || similarProducts.length === 0) {
+       console.warn("No products found for criteria, using mock.");
+       return getMockSniperResult(marca, tamanho);
+    }
 
     const targetSkus = similarProducts.map(p => p.sku);
 
@@ -169,16 +204,16 @@ export const runSalesSniper = async (
     // 4. Aggregate by Client
     const clientMap = new Map<string, SalesSniperMatch>();
 
-    // Need to fetch full client details for ID/City if needed, but 'vendas_geral' has name/phone
-    // Let's create a map based on phone
     sales?.forEach(sale => {
+      // Find items in this specific sale
       const itemsInSale = salesItems.filter(i => i.movimentacao === sale.movimentacao);
       const totalInSale = itemsInSale.reduce((acc, curr) => acc + curr.valor_venda, 0);
       
+      // Use phone as unique key
       if (!clientMap.has(sale.telefone)) {
         clientMap.set(sale.telefone, {
           cliente: {
-            id: 0, // Placeholder
+            id: 0, 
             nome: sale.nome,
             telefone: sale.telefone,
             cpf: '',
@@ -194,13 +229,16 @@ export const runSalesSniper = async (
 
       const entry = clientMap.get(sale.telefone)!;
       entry.totalGastoHistorico += totalInSale;
-      // Update last date if this sale is newer
+      
       if (new Date(sale.data) > new Date(entry.ultimaCompraData)) {
         entry.ultimaCompraData = sale.data;
       }
     });
 
-    return Array.from(clientMap.values()).sort((a, b) => new Date(b.ultimaCompraData).getTime() - new Date(a.ultimaCompraData).getTime());
+    const results = Array.from(clientMap.values())
+      .sort((a, b) => new Date(b.ultimaCompraData).getTime() - new Date(a.ultimaCompraData).getTime());
+      
+    return results.length > 0 ? results : getMockSniperResult(marca, tamanho);
 
   } catch (err) {
     console.error("Sniper Error:", err);
@@ -213,13 +251,13 @@ function getMockSniperResult(marca: string, tamanho: string): SalesSniperMatch[]
     {
       cliente: {
         id: 1,
-        nome: "Mariana Silva (Demo)",
+        nome: "Mariana Silva (Exemplo)",
         telefone: "11999990000",
         cpf: "123",
         cidade: "São Paulo",
         uf: "SP"
       },
-      motivo: "Comprou Vestido Lui Bambini Tam 6 em Dezembro",
+      motivo: `Comprou ${marca} Tam ${tamanho} em Dezembro`,
       ultimaCompraData: new Date().toISOString(),
       totalGastoHistorico: 450.00,
       produtosComprados: ["Vestido Floral"]
@@ -227,7 +265,7 @@ function getMockSniperResult(marca: string, tamanho: string): SalesSniperMatch[]
     {
       cliente: {
         id: 2,
-        nome: "Fernanda Lima (Demo)",
+        nome: "Fernanda Lima (Exemplo)",
         telefone: "11988887777",
         cpf: "456",
         cidade: "Rio de Janeiro",
