@@ -1,6 +1,3 @@
-// src/types.ts
-
-// Tabelas Base
 export interface Cliente {
   id: number;
   nome: string;
@@ -22,9 +19,8 @@ export interface Produto {
   quantidade_estoque: number;
 }
 
-// Views de Inteligência (Essenciais para o Dashboard)
 export interface AnalyticsCategoria {
-  categoria_produto: string; // Nome exato da coluna na View SQL
+  categoria_produto: string;
   qtd_pedidos: number;
   pecas_vendidas: number;
   faturamento_bruto: number;
