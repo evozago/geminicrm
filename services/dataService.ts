@@ -1,5 +1,6 @@
+
 import { createClient } from '@supabase/supabase-js';
-import { Cliente, Produto, VendaGeral, VendaItem, AnalyticsCategoria, SalesEvolutionData, RankingCliente, SalesSniperMatch } from '../types';
+import { Cliente, Produto, VendaGeral, VendaItem, AnalyticsCategoria, SalesEvolutionData, RankingCliente, SalesSniperMatch, CarteiraCliente } from '../types';
 
 // Supabase Configuration
 const SUPABASE_URL = 'https://mnxemxgcucfuoedqkygw.supabase.co';
@@ -32,6 +33,59 @@ const MOCK_RANKING_CLIENTES: RankingCliente[] = [
   { cliente_nome: 'Carla Souza', telefone: '11977777777', total_gasto: 2800, ultima_compra: '2023-09-05', dias_sem_comprar: 145 },
   { cliente_nome: 'Daniela Lima', telefone: '11966666666', total_gasto: 2100, ultima_compra: '2024-01-20', dias_sem_comprar: 10 },
   { cliente_nome: 'Fernanda Rocha', telefone: '11955555555', total_gasto: 5600, ultima_compra: '2023-08-01', dias_sem_comprar: 180 },
+];
+
+const MOCK_CARTEIRA_CLIENTES: CarteiraCliente[] = [
+  { 
+    cliente: 'Ana Silva', 
+    telefone: '11999999999', 
+    vendedor_responsavel: 'Maria', 
+    total_gasto_acumulado: 12500.00, 
+    qtd_produtos: 45, 
+    qtd_vendas: 12, 
+    ultima_compra_data: '2024-02-15',
+    ultimas_preferencias: 'Lui Bambini (6), Momi (6), Animê (8)'
+  },
+  { 
+    cliente: 'Roberta Santos', 
+    telefone: '11988888888', 
+    vendedor_responsavel: 'Joana', 
+    total_gasto_acumulado: 8900.50, 
+    qtd_produtos: 32, 
+    qtd_vendas: 8, 
+    ultima_compra_data: '2024-01-20',
+    ultimas_preferencias: 'Denim Kids (10), Authoria (12)'
+  },
+  { 
+    cliente: 'Patricia Lima', 
+    telefone: '11977777777', 
+    vendedor_responsavel: 'Maria', 
+    total_gasto_acumulado: 5400.00, 
+    qtd_produtos: 15, 
+    qtd_vendas: 4, 
+    ultima_compra_data: '2023-12-05',
+    ultimas_preferencias: 'Petit Cherie (4), Mon Sucré (4)'
+  },
+  { 
+    cliente: 'Camila Oliveira', 
+    telefone: '11966666666', 
+    vendedor_responsavel: 'Carla', 
+    total_gasto_acumulado: 3200.00, 
+    qtd_produtos: 8, 
+    qtd_vendas: 3, 
+    ultima_compra_data: '2024-02-01',
+    ultimas_preferencias: 'Momi (2), Tip Top (2)'
+  },
+  { 
+    cliente: 'Fernanda Souza', 
+    telefone: '11955555555', 
+    vendedor_responsavel: 'Joana', 
+    total_gasto_acumulado: 15000.00, 
+    qtd_produtos: 50, 
+    qtd_vendas: 15, 
+    ultima_compra_data: '2024-02-20',
+    ultimas_preferencias: 'Lui Bambini (8), Animê (8), I am Authoria (14)'
+  }
 ];
 
 // --- DASHBOARD SERVICES ---
@@ -144,6 +198,24 @@ export const getRankingClientes = async (): Promise<RankingCliente[]> => {
     return data && data.length > 0 ? data : MOCK_RANKING_CLIENTES;
   } catch (e) {
     return MOCK_RANKING_CLIENTES;
+  }
+};
+
+export const getCarteiraClientes = async (): Promise<CarteiraCliente[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('gemini_vw_relatorio_carteira_clientes')
+      .select('*')
+      .order('total_gasto_acumulado', { ascending: false });
+
+    if (error) {
+      console.error("Error fetching carteira:", error);
+      return MOCK_CARTEIRA_CLIENTES;
+    }
+    return data && data.length > 0 ? data : MOCK_CARTEIRA_CLIENTES;
+  } catch (e) {
+    console.error("Critical error carteira:", e);
+    return MOCK_CARTEIRA_CLIENTES;
   }
 };
 

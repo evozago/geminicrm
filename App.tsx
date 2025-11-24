@@ -1,13 +1,16 @@
+
 import React, { useState } from 'react';
 import { Dashboard } from './components/Dashboard';
 import { SalesSniper } from './components/SalesSniper';
 import { ChurnAnalysis } from './components/ChurnAnalysis';
-import { LayoutDashboard, Target, Users, Menu, X, ShoppingBag } from 'lucide-react';
+import { ClientPortfolio } from './components/ClientPortfolio';
+import { LayoutDashboard, Target, Users, Menu, X, ShoppingBag, Briefcase } from 'lucide-react';
 
 enum View {
   DASHBOARD = 'dashboard',
   SNIPER = 'sniper',
-  CHURN = 'churn'
+  CHURN = 'churn',
+  PORTFOLIO = 'portfolio'
 }
 
 const App: React.FC = () => {
@@ -59,6 +62,7 @@ const App: React.FC = () => {
 
           <nav className="space-y-2 flex-1">
             <NavItem view={View.DASHBOARD} icon={LayoutDashboard} label="Dashboard Geral" />
+            <NavItem view={View.PORTFOLIO} icon={Briefcase} label="Carteira de Clientes" />
             <NavItem view={View.SNIPER} icon={Target} label="Sniper de Vendas" />
             <NavItem view={View.CHURN} icon={Users} label="Clientes Sumidos" />
           </nav>
@@ -89,6 +93,7 @@ const App: React.FC = () => {
         <div className="flex-1 overflow-auto p-4 lg:p-8">
           <div className="max-w-6xl mx-auto">
             {currentView === View.DASHBOARD && <Dashboard />}
+            {currentView === View.PORTFOLIO && <ClientPortfolio />}
             {currentView === View.SNIPER && <SalesSniper />}
             {currentView === View.CHURN && <ChurnAnalysis />}
           </div>

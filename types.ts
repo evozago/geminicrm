@@ -1,3 +1,4 @@
+
 export interface Cliente {
   id: number;
   nome: string;
@@ -65,4 +66,15 @@ export interface SalesSniperMatch {
   ultimaCompraData: string;
   totalGastoHistorico: number;
   produtosComprados: string[];
+}
+
+export interface CarteiraCliente {
+  cliente: string; // Nome do cliente
+  telefone: string;
+  vendedor_responsavel: string; // Último vendedor
+  total_gasto_acumulado: number;
+  qtd_produtos: number;
+  qtd_vendas: number; // Quantidade de tickets/vendas
+  ultima_compra_data: string;
+  ultimas_preferencias: string; // String descritiva: "Lui Bambini (6), Momi (8)"
 }
