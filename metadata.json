@@ -1,0 +1,5 @@
+{
+  "name": "ModaIntel - Sales Intelligence",
+  "description": "A React-based sales intelligence dashboard for clothing retail, featuring sales tracking, a 'Sales Sniper' recommendation engine, and churn analysis powered by Gemini AI.",
+  "requestFramePermissions": []
+}
