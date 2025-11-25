@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { AnalyticsCategoria, SalesEvolutionData, SalesSniperMatch, CarteiraCliente } from '../types';
+import { AnalyticsCategoria, SalesEvolutionData, SalesSniperMatch, CarteiraCliente, RankingCliente } from '../types';
 
 // CONFIGURAÇÃO SUPABASE
 // NOTA: Em produção, use import.meta.env.VITE_SUPABASE_URL
@@ -7,6 +7,31 @@ const SUPABASE_URL = 'https://mnxemxgcucfuoedqkygw.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1ueGVteGdjdWNmdW9lZHFreWd3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM4OTY5MTYsImV4cCI6MjA2OTQ3MjkxNn0.JeDMKgnwRcK71KOIun8txqFFBWEHSKdPzIF8Qm9tw1o';
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// Healthcheck simples usado pelo App para exibir status de conexão
+export const checkSupabaseConnection = async () => {
+  try {
+    const { error } = await supabase
+      .from('gemini_vw_analytics_categorias')
+      .select('categoria_produto', { head: true })
+      .limit(1);
+
+    if (error) {
+      if (error.message?.toLowerCase().includes('fetch failed')) {
+        return {
+          success: false,
+          message:
+            'Não foi possível alcançar o Supabase a partir do ambiente atual (rede bloqueada ou offline). Tente novamente em outra rede ou configure as variáveis VITE_SUPABASE_URL e VITE_SUPABASE_KEY.',
+        };
+      }
+      return { success: false, message: error.message };
+    }
+
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, message: err?.message || 'Falha ao conectar ao Supabase' };
+  }
+};
 
 // --- 1. DASHBOARD ---
 export const getDashboardStats = async () => {
@@ -76,6 +101,27 @@ export const getCarteiraClientes = async (vendedorFiltro?: string): Promise<Cart
     return data || [];
   } catch (e) {
     console.error("❌ Erro JS Carteira:", e);
+    return [];
+  }
+};
+
+// --- 2.1 Ranking de Clientes para churn ---
+export const getRankingClientes = async (): Promise<RankingCliente[]> => {
+  console.log('🔄 Buscando Ranking de Clientes...');
+  try {
+    const { data, error } = await supabase
+      .from('gemini_vw_ranking_clientes')
+      .select('cliente_nome, telefone, dias_sem_comprar, total_gasto, ultima_compra')
+      .order('dias_sem_comprar', { ascending: false });
+
+    if (error) {
+      console.error('❌ Erro Ranking Clientes:', error);
+      return [];
+    }
+
+    return data || [];
+  } catch (err) {
+    console.error('❌ Erro JS Ranking Clientes:', err);
     return [];
   }
 };

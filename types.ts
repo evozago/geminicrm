@@ -55,3 +55,11 @@ export interface SalesSniperMatch {
   ultimaCompraData: string;
   totalGastoHistorico: number;
 }
+
+export interface RankingCliente {
+  cliente_nome: string;
+  telefone: string;
+  dias_sem_comprar: number;
+  total_gasto: number;
+  ultima_compra: string;
+}

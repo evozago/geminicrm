@@ -16,5 +16,8 @@ View your app in AI Studio: https://ai.studio/apps/drive/19N1Qpj2M1vdqmoTAWeePUO
 1. Install dependencies:
    `npm install`
 2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
+3. (Optional) Configure Supabase connection for live data by setting `VITE_SUPABASE_URL` and `VITE_SUPABASE_KEY` in `.env.local`.
+4. To check if the Supabase endpoint is reachable from your network, run:
+   `npm run check:supabase`
+5. Run the app:
    `npm run dev`
