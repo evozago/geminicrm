@@ -21,3 +21,13 @@ View your app in AI Studio: https://ai.studio/apps/drive/19N1Qpj2M1vdqmoTAWeePUO
    `npm run check:supabase`
 5. Run the app:
    `npm run dev`
+
+## Consultas analíticas prontas
+As funções em `services/dataService.ts` expõem leituras analíticas com filtros opcionais para os artefatos do Supabase:
+
+- `getAnalyticsCategorias(filtros)` lê `gemini_vw_analytics_categorias` filtrando por categoria, faturamento mínimo e limite de linhas.
+- `getAnaliseMensal(filtros)` usa `gemini_vw_analise_mensal` com recorte de período (`inicio`/`fim`) e por `tipo_operacao`.
+- `getCarteiraClientesAnalitica(filtros)` consulta `gemini_vw_relatorio_carteira_clientes` por vendedor, cliente, cidade ou gasto acumulado.
+- `getClientes`, `getProdutos`, `getVendasItens` e `getVendasGeral` fazem leituras detalhadas das tabelas originais com filtros de texto, datas e valores.
+
+Todos os filtros são opcionais e usam comparações flexíveis (`ilike`) para busca textual. Consulte as assinaturas em `types.ts` para ver os campos disponíveis.

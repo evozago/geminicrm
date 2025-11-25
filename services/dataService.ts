@@ -1,5 +1,22 @@
 import { createClient } from '@supabase/supabase-js';
-import { AnalyticsCategoria, SalesEvolutionData, SalesSniperMatch, CarteiraCliente, RankingCliente } from '../types';
+import {
+  AnalyticsCategoria,
+  AnalyticsFiltro,
+  SalesEvolutionData,
+  SalesSniperMatch,
+  CarteiraCliente,
+  CarteiraFiltro,
+  RankingCliente,
+  AnaliseMensalFiltro,
+  Cliente,
+  ClienteFiltro,
+  Produto,
+  ProdutoFiltro,
+  VendaGeral,
+  VendaGeralFiltro,
+  VendaItem,
+  VendaItemFiltro,
+} from '../types';
 
 // CONFIGURAÇÃO SUPABASE
 // NOTA: Em produção, use import.meta.env.VITE_SUPABASE_URL
@@ -31,6 +48,16 @@ export const checkSupabaseConnection = async () => {
   } catch (err: any) {
     return { success: false, message: err?.message || 'Falha ao conectar ao Supabase' };
   }
+};
+
+const applyDateRange = (
+  query: ReturnType<typeof supabase.from<any>>,
+  startDate?: string,
+  endDate?: string,
+) => {
+  if (startDate) query = query.gte('data', startDate);
+  if (endDate) query = query.lte('data', endDate);
+  return query;
 };
 
 // --- 1. DASHBOARD ---
@@ -79,6 +106,62 @@ export const getDashboardStats = async () => {
   }
 };
 
+export const getAnalyticsCategorias = async (
+  filtros: AnalyticsFiltro = {},
+): Promise<AnalyticsCategoria[]> => {
+  let query = supabase
+    .from('gemini_vw_analytics_categorias')
+    .select('*')
+    .order('faturamento_bruto', { ascending: false });
+
+  if (filtros.categoria) {
+    query = query.ilike('categoria_produto', `%${filtros.categoria}%`);
+  }
+  if (typeof filtros.minFaturamento === 'number') {
+    query = query.gte('faturamento_bruto', filtros.minFaturamento);
+  }
+  if (typeof filtros.minLucro === 'number') {
+    query = query.gte('lucro_estimado', filtros.minLucro);
+  }
+  if (typeof filtros.limit === 'number') {
+    query = query.limit(filtros.limit);
+  }
+
+  const { data, error } = await query;
+  if (error) {
+    console.error('❌ Erro ao carregar gemini_vw_analytics_categorias:', error);
+    return [];
+  }
+
+  return data || [];
+};
+
+export const getAnaliseMensal = async (
+  filtros: AnaliseMensalFiltro = {},
+): Promise<SalesEvolutionData[]> => {
+  let query = supabase
+    .from('gemini_vw_analise_mensal')
+    .select('*')
+    .order('mes_ano', { ascending: true });
+
+  if (filtros.inicio) {
+    query = query.gte('mes_ano', filtros.inicio);
+  }
+  if (filtros.fim) {
+    query = query.lte('mes_ano', filtros.fim);
+  }
+  if (filtros.tipo_operacao) {
+    query = query.eq('tipo_operacao', filtros.tipo_operacao);
+  }
+
+  const { data, error } = await query;
+  if (error) {
+    console.error('❌ Erro ao carregar gemini_vw_analise_mensal:', error);
+    return [];
+  }
+  return data || [];
+};
+
 // --- 2. CARTEIRA DE CLIENTES ---
 export const getCarteiraClientes = async (vendedorFiltro?: string): Promise<CarteiraCliente[]> => {
   console.log(`🔄 Buscando Carteira. Filtro: ${vendedorFiltro}`);
@@ -105,6 +188,30 @@ export const getCarteiraClientes = async (vendedorFiltro?: string): Promise<Cart
   }
 };
 
+export const getCarteiraClientesAnalitica = async (
+  filtros: CarteiraFiltro = {},
+): Promise<CarteiraCliente[]> => {
+  let query = supabase
+    .from('gemini_vw_relatorio_carteira_clientes')
+    .select('*')
+    .order('total_gasto_acumulado', { ascending: false });
+
+  if (filtros.vendedor) query = query.eq('vendedor_responsavel', filtros.vendedor);
+  if (filtros.cliente) query = query.ilike('cliente', `%${filtros.cliente}%`);
+  if (filtros.cidade) query = query.ilike('cidade', `%${filtros.cidade}%`);
+  if (typeof filtros.minTotalGasto === 'number') {
+    query = query.gte('total_gasto_acumulado', filtros.minTotalGasto);
+  }
+
+  const { data, error } = await query;
+  if (error) {
+    console.error('❌ Erro ao carregar carteira analítica:', error);
+    return [];
+  }
+
+  return data || [];
+};
+
 // --- 2.1 Ranking de Clientes para churn ---
 export const getRankingClientes = async (): Promise<RankingCliente[]> => {
   console.log('🔄 Buscando Ranking de Clientes...');
@@ -124,6 +231,86 @@ export const getRankingClientes = async (): Promise<RankingCliente[]> => {
     console.error('❌ Erro JS Ranking Clientes:', err);
     return [];
   }
+};
+
+// --- 4. Leituras detalhadas ---
+export const getClientes = async (filtros: ClienteFiltro = {}): Promise<Cliente[]> => {
+  let query = supabase
+    .from('gemini_clientes')
+    .select('*')
+    .order('nome', { ascending: true });
+
+  if (filtros.nome) query = query.ilike('nome', `%${filtros.nome}%`);
+  if (filtros.cidade) query = query.ilike('cidade', `%${filtros.cidade}%`);
+  if (filtros.uf) query = query.eq('uf', filtros.uf);
+
+  const { data, error } = await query;
+  if (error) {
+    console.error('❌ Erro ao carregar gemini_clientes:', error);
+    return [];
+  }
+  return data || [];
+};
+
+export const getProdutos = async (filtros: ProdutoFiltro = {}): Promise<Produto[]> => {
+  let query = supabase
+    .from('gemini_produtos')
+    .select('*')
+    .order('nome_produto', { ascending: true });
+
+  if (filtros.categoria) query = query.eq('categoria_produto', filtros.categoria);
+  if (filtros.marca) query = query.eq('marca', filtros.marca);
+  if (filtros.tamanho) query = query.ilike('tamanho', `%${filtros.tamanho}%`);
+  if (filtros.genero) query = query.eq('genero', filtros.genero);
+  if (typeof filtros.estoqueMenorQue === 'number') query = query.lt('quantidade_estoque', filtros.estoqueMenorQue);
+  if (filtros.buscaNome) query = query.ilike('nome_produto', `%${filtros.buscaNome}%`);
+
+  const { data, error } = await query;
+  if (error) {
+    console.error('❌ Erro ao carregar gemini_produtos:', error);
+    return [];
+  }
+  return data || [];
+};
+
+export const getVendasItens = async (filtros: VendaItemFiltro = {}): Promise<VendaItem[]> => {
+  let query = supabase
+    .from('gemini_vendas_itens')
+    .select('*')
+    .order('data', { ascending: false });
+
+  if (filtros.vendedor) query = query.eq('vendedor', filtros.vendedor);
+  if (filtros.sku) query = query.eq('sku', filtros.sku);
+  if (filtros.movimentacao) query = query.eq('movimentacao', filtros.movimentacao);
+  if (filtros.cliente) query = query.ilike('nome', `%${filtros.cliente}%`);
+  query = applyDateRange(query, filtros.dataDe, filtros.dataAte);
+
+  const { data, error } = await query;
+  if (error) {
+    console.error('❌ Erro ao carregar gemini_vendas_itens:', error);
+    return [];
+  }
+  return data || [];
+};
+
+export const getVendasGeral = async (filtros: VendaGeralFiltro = {}): Promise<VendaGeral[]> => {
+  let query = supabase
+    .from('gemini_vendas_geral')
+    .select('*')
+    .order('movimentacao', { ascending: false });
+
+  if (filtros.movimentacao) query = query.eq('movimentacao', filtros.movimentacao);
+  if (filtros.tipo_operacao) query = query.eq('tipo_operacao', filtros.tipo_operacao);
+  if (typeof filtros.totalVendaMin === 'number') query = query.gte('total_venda', filtros.totalVendaMin);
+  if (typeof filtros.totalVendaMax === 'number') query = query.lte('total_venda', filtros.totalVendaMax);
+  if (filtros.nome) query = query.ilike('nome', `%${filtros.nome}%`);
+
+  const { data, error } = await query;
+  if (error) {
+    console.error('❌ Erro ao carregar gemini_vendas_geral:', error);
+    return [];
+  }
+  return data || [];
 };
 
 // --- 3. SNIPER DE VENDAS ---
