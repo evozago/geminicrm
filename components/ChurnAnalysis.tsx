@@ -44,6 +44,12 @@ export const ChurnAnalysis: React.FC = () => {
         </div>
       </div>
 
+      {clients.length === 0 && (
+        <div className="bg-white border border-amber-200 text-amber-700 p-8 rounded-xl">
+          Não encontramos clientes inativos agora. Se esperava dados, verifique a conexão com o Supabase.
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {clients.map((client) => (
           <div key={client.cliente_nome} className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden group hover:border-orange-200 transition-all">

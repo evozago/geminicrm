@@ -6,11 +6,13 @@ import { AnalyticsCategoria, SalesEvolutionData } from '../types';
 export const Dashboard: React.FC = () => {
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [offline, setOffline] = useState(false);
 
   useEffect(() => {
     const load = async () => {
       const data = await getDashboardStats();
       setStats(data);
+      setOffline(Boolean((data as any)?.offline));
       setLoading(false);
     };
     load();
@@ -27,7 +29,7 @@ export const Dashboard: React.FC = () => {
             <div>
               <p className="text-sm text-slate-500 font-medium">Faturamento Estimado</p>
               <h3 className="text-2xl font-bold text-slate-800 mt-1">
-                R$ {stats?.kpis?.faturamentoMes?.toLocaleString('pt-BR')}
+                R$ {(stats?.kpis?.faturamentoMes ?? 0).toLocaleString('pt-BR')}
               </h3>
             </div>
             <div className="p-3 bg-emerald-100 text-emerald-600 rounded-lg">
@@ -41,7 +43,7 @@ export const Dashboard: React.FC = () => {
             <div>
               <p className="text-sm text-slate-500 font-medium">Lucro Líquido (Est.)</p>
               <h3 className="text-2xl font-bold text-emerald-600 mt-1">
-                R$ {stats?.kpis?.lucroEstimado?.toLocaleString('pt-BR')}
+                R$ {(stats?.kpis?.lucroEstimado ?? 0).toLocaleString('pt-BR')}
               </h3>
             </div>
             <div className="p-3 bg-blue-100 text-blue-600 rounded-lg">
@@ -55,7 +57,7 @@ export const Dashboard: React.FC = () => {
             <div>
               <p className="text-sm text-slate-500 font-medium">Total de Pedidos</p>
               <h3 className="text-2xl font-bold text-slate-800 mt-1">
-                {stats?.kpis?.totalPedidos}
+                {stats?.kpis?.totalPedidos ?? 0}
               </h3>
             </div>
             <div className="p-3 bg-purple-100 text-purple-600 rounded-lg">
@@ -64,6 +66,16 @@ export const Dashboard: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {offline && (
+        <div className="flex items-center gap-3 p-4 bg-amber-50 border border-amber-200 rounded-xl text-amber-700">
+          <Activity size={18} />
+          <div>
+            <p className="font-semibold">Exibindo dados demonstrativos</p>
+            <p className="text-sm">Não foi possível ler o Supabase; mostramos uma amostra para continuar a navegação.</p>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Gráfico de Categorias */}

@@ -7,7 +7,7 @@ export const ClientPortfolio: React.FC = () => {
   const [clientes, setClientes] = useState<CarteiraCliente[]>([]);
   const [loading, setLoading] = useState(true);
   const [vendedorSelecionado, setVendedorSelecionado] = useState('Todos');
-  const [listaVendedores, setListaVendedores] = useState<string[]>([]);
+  const [listaVendedores, setListaVendedores] = useState<string[]>(['Todos']);
 
   useEffect(() => {
     carregarDados();
@@ -56,6 +56,10 @@ export const ClientPortfolio: React.FC = () => {
 
       {loading ? (
         <div className="text-center py-20 text-slate-400">Carregando carteira...</div>
+      ) : clientes.length === 0 ? (
+        <div className="bg-white rounded-xl border border-amber-200 text-amber-700 p-10 text-center font-medium">
+          Não foi possível carregar a carteira agora. Verifique a conexão com o Supabase e tente novamente.
+        </div>
       ) : (
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
           <table className="w-full text-left border-collapse">
