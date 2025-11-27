@@ -1,5 +1,12 @@
 import { supabase } from "@/integrations/supabase/client";
-import { AnalyticsCategoria, SalesEvolutionData, SalesSniperMatch, CarteiraCliente, InventoryAnalytics } from '../types';
+import { 
+  AnalyticsCategoria, 
+  SalesEvolutionData, 
+  SalesSniperMatch, 
+  CarteiraCliente, 
+  InventoryAnalytics,
+  RankingCliente 
+} from '../types';
 
 // --- 1. DASHBOARD ---
 export const getDashboardStats = async () => {
@@ -161,6 +168,44 @@ export const getInventoryAnalytics = async (): Promise<InventoryAnalytics[]> => 
 
   } catch (e) {
     console.error("Erro Analytics:", e);
+    return [];
+  }
+};
+
+// --- 5. CORREÇÃO: ANÁLISE DE CHURN (CLIENTES SUMIDOS) ---
+export const getRankingClientes = async (): Promise<RankingCliente[]> => {
+  console.log("🔄 Carregando Ranking de Clientes (Churn)...");
+  try {
+    // Reutiliza a view de carteira que já contém os dados essenciais
+    // Isso evita criar uma nova view no banco se a 'gemini_vw_relatorio_churn' não existir
+    const { data, error } = await supabase
+      .from('gemini_vw_relatorio_carteira_clientes')
+      .select('*');
+
+    if (error) {
+      console.error("Erro ao buscar dados para Churn:", error);
+      return [];
+    }
+
+    // Processamento no Frontend para calcular dias sem comprar
+    return (data || []).map((cliente: any) => {
+      const ultimaCompra = new Date(cliente.data_ultima_compra);
+      const hoje = new Date();
+      
+      // Cálculo da diferença em dias
+      const diffTime = Math.abs(hoje.getTime() - ultimaCompra.getTime());
+      const diasSemComprar = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+      return {
+        cliente_nome: cliente.cliente || "Cliente Desconhecido",
+        telefone: cliente.telefone || "",
+        total_gasto: cliente.total_gasto_acumulado || 0,
+        ultima_compra: cliente.data_ultima_compra,
+        dias_sem_comprar: diasSemComprar
+      };
+    });
+  } catch (e) {
+    console.error("Erro inesperado no Churn:", e);
     return [];
   }
 };
