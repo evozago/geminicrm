@@ -51,6 +51,7 @@ export interface CarteiraCliente {
   qtd_vendas: number;
   data_ultima_compra: string;
   ultimas_preferencias: string;
+  telefone?: string; // Adicionado para garantir compatibilidade
 }
 
 export interface SalesSniperMatch {
@@ -79,4 +80,13 @@ export interface InventoryAnalytics {
   // Campos calculados no Front-end
   sugestao?: 'COMPRAR' | 'LIQUIDAR' | 'MANTER';
   cobertura_dias?: number;
+}
+
+// --- CORREÇÃO: ANÁLISE DE CHURN ---
+export interface RankingCliente {
+  cliente_nome: string;
+  telefone: string;
+  total_gasto: number;
+  ultima_compra: string;
+  dias_sem_comprar: number;
 }
