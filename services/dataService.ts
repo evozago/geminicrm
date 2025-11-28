@@ -1,92 +1,34 @@
-import { createClient } from '@supabase/supabase-js';
-import {
-  AnalyticsCategoria,
-  AnalyticsFiltro,
-  SalesEvolutionData,
-  SalesSniperMatch,
-  CarteiraCliente,
-  CarteiraFiltro,
-  RankingCliente,
-  AnaliseMensalFiltro,
-  Cliente,
-  ClienteFiltro,
-  Produto,
-  ProdutoFiltro,
-  VendaGeral,
-  VendaGeralFiltro,
-  VendaItem,
-  VendaItemFiltro,
+import { supabase } from "@/integrations/supabase/client";
+import { 
+  AnalyticsCategoria, 
+  SalesEvolutionData, 
+  SalesSniperMatch, 
+  CarteiraCliente, 
+  InventoryAnalytics,
+  RankingCliente 
 } from '../types';
-
-// CONFIGURAÇÃO SUPABASE
-// NOTA: Em produção, use import.meta.env.VITE_SUPABASE_URL
-const SUPABASE_URL = 'https://mnxemxgcucfuoedqkygw.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1ueGVteGdjdWNmdW9lZHFreWd3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM4OTY5MTYsImV4cCI6MjA2OTQ3MjkxNn0.JeDMKgnwRcK71KOIun8txqFFBWEHSKdPzIF8Qm9tw1o';
-
-export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
-
-// Healthcheck simples usado pelo App para exibir status de conexão
-export const checkSupabaseConnection = async () => {
-  try {
-    const { error } = await supabase
-      .from('gemini_vw_analytics_categorias')
-      .select('categoria_produto', { head: true })
-      .limit(1);
-
-    if (error) {
-      if (error.message?.toLowerCase().includes('fetch failed')) {
-        return {
-          success: false,
-          message:
-            'Não foi possível alcançar o Supabase a partir do ambiente atual (rede bloqueada ou offline). Tente novamente em outra rede ou configure as variáveis VITE_SUPABASE_URL e VITE_SUPABASE_KEY.',
-        };
-      }
-      return { success: false, message: error.message };
-    }
-
-    return { success: true };
-  } catch (err: any) {
-    return { success: false, message: err?.message || 'Falha ao conectar ao Supabase' };
-  }
-};
-
-const applyDateRange = (
-  query: ReturnType<typeof supabase.from<any>>,
-  startDate?: string,
-  endDate?: string,
-) => {
-  if (startDate) query = query.gte('data', startDate);
-  if (endDate) query = query.lte('data', endDate);
-  return query;
-};
 
 // --- 1. DASHBOARD ---
 export const getDashboardStats = async () => {
-  console.log("🔄 Buscando dados do Dashboard...");
+  console.log("🔄 Carregando Dashboard...");
   try {
-    // Busca Categorias
     const { data: catData, error: catError } = await supabase
       .from('gemini_vw_analytics_categorias')
       .select('*')
       .order('faturamento_bruto', { ascending: false })
       .limit(5);
 
-    if (catError) console.error("❌ Erro Categorias:", catError);
+    if (catError) console.error("Erro Categorias:", catError);
 
-    // Busca Evolução
     const { data: evoData, error: evoError } = await supabase
       .from('gemini_vw_analise_mensal')
       .select('*')
       .order('mes_ano', { ascending: true });
 
-    if (evoError) console.error("❌ Erro Evolução:", evoError);
+    if (evoError) console.error("Erro Evolução:", evoError);
 
-    // Cálculos KPI
     const faturamentoTotal = catData?.reduce((acc, curr) => acc + (curr.faturamento_bruto || 0), 0) || 0;
     const lucroTotal = catData?.reduce((acc, curr) => acc + (curr.lucro_estimado || 0), 0) || 0;
-    
-    // Total de pedidos (soma de todos os meses da evolução)
-    // Filtramos para não somar duplicado se tiver múltiplas linhas por mês
     const totalPedidos = evoData?.reduce((acc, curr) => acc + (curr.total_atendimentos || 0), 0) || 0;
 
     return {
@@ -101,70 +43,13 @@ export const getDashboardStats = async () => {
       }
     };
   } catch (e) {
-    console.error("❌ Erro Crítico Dashboard:", e);
+    console.error("Erro Dashboard:", e);
     return null;
   }
 };
 
-export const getAnalyticsCategorias = async (
-  filtros: AnalyticsFiltro = {},
-): Promise<AnalyticsCategoria[]> => {
-  let query = supabase
-    .from('gemini_vw_analytics_categorias')
-    .select('*')
-    .order('faturamento_bruto', { ascending: false });
-
-  if (filtros.categoria) {
-    query = query.ilike('categoria_produto', `%${filtros.categoria}%`);
-  }
-  if (typeof filtros.minFaturamento === 'number') {
-    query = query.gte('faturamento_bruto', filtros.minFaturamento);
-  }
-  if (typeof filtros.minLucro === 'number') {
-    query = query.gte('lucro_estimado', filtros.minLucro);
-  }
-  if (typeof filtros.limit === 'number') {
-    query = query.limit(filtros.limit);
-  }
-
-  const { data, error } = await query;
-  if (error) {
-    console.error('❌ Erro ao carregar gemini_vw_analytics_categorias:', error);
-    return [];
-  }
-
-  return data || [];
-};
-
-export const getAnaliseMensal = async (
-  filtros: AnaliseMensalFiltro = {},
-): Promise<SalesEvolutionData[]> => {
-  let query = supabase
-    .from('gemini_vw_analise_mensal')
-    .select('*')
-    .order('mes_ano', { ascending: true });
-
-  if (filtros.inicio) {
-    query = query.gte('mes_ano', filtros.inicio);
-  }
-  if (filtros.fim) {
-    query = query.lte('mes_ano', filtros.fim);
-  }
-  if (filtros.tipo_operacao) {
-    query = query.eq('tipo_operacao', filtros.tipo_operacao);
-  }
-
-  const { data, error } = await query;
-  if (error) {
-    console.error('❌ Erro ao carregar gemini_vw_analise_mensal:', error);
-    return [];
-  }
-  return data || [];
-};
-
 // --- 2. CARTEIRA DE CLIENTES ---
 export const getCarteiraClientes = async (vendedorFiltro?: string): Promise<CarteiraCliente[]> => {
-  console.log(`🔄 Buscando Carteira. Filtro: ${vendedorFiltro}`);
   try {
     let query = supabase
       .from('gemini_vw_relatorio_carteira_clientes')
@@ -176,212 +61,151 @@ export const getCarteiraClientes = async (vendedorFiltro?: string): Promise<Cart
     }
 
     const { data, error } = await query;
-
-    if (error) {
-      console.error("❌ Erro SQL Carteira:", error);
-      return [];
-    }
+    if (error) { console.error("Erro Carteira:", error); return []; }
     return data || [];
   } catch (e) {
-    console.error("❌ Erro JS Carteira:", e);
+    console.error("Erro Carteira JS:", e);
     return [];
   }
-};
-
-export const getCarteiraClientesAnalitica = async (
-  filtros: CarteiraFiltro = {},
-): Promise<CarteiraCliente[]> => {
-  let query = supabase
-    .from('gemini_vw_relatorio_carteira_clientes')
-    .select('*')
-    .order('total_gasto_acumulado', { ascending: false });
-
-  if (filtros.vendedor) query = query.eq('vendedor_responsavel', filtros.vendedor);
-  if (filtros.cliente) query = query.ilike('cliente', `%${filtros.cliente}%`);
-  if (filtros.cidade) query = query.ilike('cidade', `%${filtros.cidade}%`);
-  if (typeof filtros.minTotalGasto === 'number') {
-    query = query.gte('total_gasto_acumulado', filtros.minTotalGasto);
-  }
-
-  const { data, error } = await query;
-  if (error) {
-    console.error('❌ Erro ao carregar carteira analítica:', error);
-    return [];
-  }
-
-  return data || [];
-};
-
-// --- 2.1 Ranking de Clientes para churn ---
-export const getRankingClientes = async (): Promise<RankingCliente[]> => {
-  console.log('🔄 Buscando Ranking de Clientes...');
-  try {
-    const { data, error } = await supabase
-      .from('gemini_vw_ranking_clientes')
-      .select('cliente_nome, telefone, dias_sem_comprar, total_gasto, ultima_compra')
-      .order('dias_sem_comprar', { ascending: false });
-
-    if (error) {
-      console.error('❌ Erro Ranking Clientes:', error);
-      return [];
-    }
-
-    return data || [];
-  } catch (err) {
-    console.error('❌ Erro JS Ranking Clientes:', err);
-    return [];
-  }
-};
-
-// --- 4. Leituras detalhadas ---
-export const getClientes = async (filtros: ClienteFiltro = {}): Promise<Cliente[]> => {
-  let query = supabase
-    .from('gemini_clientes')
-    .select('*')
-    .order('nome', { ascending: true });
-
-  if (filtros.nome) query = query.ilike('nome', `%${filtros.nome}%`);
-  if (filtros.cidade) query = query.ilike('cidade', `%${filtros.cidade}%`);
-  if (filtros.uf) query = query.eq('uf', filtros.uf);
-
-  const { data, error } = await query;
-  if (error) {
-    console.error('❌ Erro ao carregar gemini_clientes:', error);
-    return [];
-  }
-  return data || [];
-};
-
-export const getProdutos = async (filtros: ProdutoFiltro = {}): Promise<Produto[]> => {
-  let query = supabase
-    .from('gemini_produtos')
-    .select('*')
-    .order('nome_produto', { ascending: true });
-
-  if (filtros.categoria) query = query.eq('categoria_produto', filtros.categoria);
-  if (filtros.marca) query = query.eq('marca', filtros.marca);
-  if (filtros.tamanho) query = query.ilike('tamanho', `%${filtros.tamanho}%`);
-  if (filtros.genero) query = query.eq('genero', filtros.genero);
-  if (typeof filtros.estoqueMenorQue === 'number') query = query.lt('quantidade_estoque', filtros.estoqueMenorQue);
-  if (filtros.buscaNome) query = query.ilike('nome_produto', `%${filtros.buscaNome}%`);
-
-  const { data, error } = await query;
-  if (error) {
-    console.error('❌ Erro ao carregar gemini_produtos:', error);
-    return [];
-  }
-  return data || [];
-};
-
-export const getVendasItens = async (filtros: VendaItemFiltro = {}): Promise<VendaItem[]> => {
-  let query = supabase
-    .from('gemini_vendas_itens')
-    .select('*')
-    .order('data', { ascending: false });
-
-  if (filtros.vendedor) query = query.eq('vendedor', filtros.vendedor);
-  if (filtros.sku) query = query.eq('sku', filtros.sku);
-  if (filtros.movimentacao) query = query.eq('movimentacao', filtros.movimentacao);
-  if (filtros.cliente) query = query.ilike('nome', `%${filtros.cliente}%`);
-  query = applyDateRange(query, filtros.dataDe, filtros.dataAte);
-
-  const { data, error } = await query;
-  if (error) {
-    console.error('❌ Erro ao carregar gemini_vendas_itens:', error);
-    return [];
-  }
-  return data || [];
-};
-
-export const getVendasGeral = async (filtros: VendaGeralFiltro = {}): Promise<VendaGeral[]> => {
-  let query = supabase
-    .from('gemini_vendas_geral')
-    .select('*')
-    .order('movimentacao', { ascending: false });
-
-  if (filtros.movimentacao) query = query.eq('movimentacao', filtros.movimentacao);
-  if (filtros.tipo_operacao) query = query.eq('tipo_operacao', filtros.tipo_operacao);
-  if (typeof filtros.totalVendaMin === 'number') query = query.gte('total_venda', filtros.totalVendaMin);
-  if (typeof filtros.totalVendaMax === 'number') query = query.lte('total_venda', filtros.totalVendaMax);
-  if (filtros.nome) query = query.ilike('nome', `%${filtros.nome}%`);
-
-  const { data, error } = await query;
-  if (error) {
-    console.error('❌ Erro ao carregar gemini_vendas_geral:', error);
-    return [];
-  }
-  return data || [];
 };
 
 // --- 3. SNIPER DE VENDAS ---
-export const runSalesSniper = async (
-  marca: string, 
-  tamanho: string, 
-  genero: string, 
-  categoria: string
-): Promise<SalesSniperMatch[]> => {
-  console.log(`🎯 Iniciando Sniper: ${marca}, ${tamanho}, ${genero}`);
-  
+export const runSalesSniper = async (marca: string, tamanho: string, genero: string, categoria: string): Promise<SalesSniperMatch[]> => {
+  console.log(`🎯 Sniper: ${marca} | ${genero} | ${tamanho}`);
   try {
-    const sixMonthsAgo = new Date();
-    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-
-    // ESTRATÉGIA MAIS SIMPLES E EFICAZ:
-    // 1. Buscar na tabela de ITENS quem comprou produtos parecidos nos últimos 6 meses.
-    // Usamos .ilike para ser flexível (ex: buscar "6" encontra "6", "06", "Tam 6")
+    const searchWindow = new Date();
+    searchWindow.setMonth(searchWindow.getMonth() - 12);
     
-    const { data: itensEncontrados, error: erroItens } = await supabase
+    let queryProdutos = supabase.from('gemini_produtos').select('sku').ilike('marca', `%${marca}%`); 
+    if (genero && genero !== 'Unissex') queryProdutos = queryProdutos.ilike('genero', `%${genero}%`);
+
+    const { data: produtosAlvo, error: erroProd } = await queryProdutos;
+    if (erroProd || !produtosAlvo || produtosAlvo.length === 0) return [];
+
+    const skusPermitidos = produtosAlvo.map(p => p.sku);
+
+    const { data: itensVendidos, error: erroItens } = await supabase
       .from('gemini_vendas_itens')
-      .select('movimentacao, sku, tamanho, cor, nome, data')
-      .gt('data', sixMonthsAgo.toISOString())
-      .ilike('tamanho', `%${tamanho}%`) 
-      // Se quiser filtrar por marca também, precisaríamos fazer um join, 
-      // mas vamos focar no tamanho e nome do cliente que já temos na tabela itens
-      .limit(200);
+      .select('movimentacao, tamanho, data, sku')
+      .gt('data', searchWindow.toISOString())
+      .in('sku', skusPermitidos)
+      .ilike('tamanho', `${tamanho}`);
 
-    if (erroItens) {
-      console.error("❌ Erro Sniper Itens:", erroItens);
-      throw erroItens;
-    }
+    if (erroItens) throw erroItens;
+    if (!itensVendidos || itensVendidos.length === 0) return [];
 
-    if (!itensEncontrados || itensEncontrados.length === 0) {
-      console.warn("⚠️ Sniper: Nenhum item encontrado com esses filtros.");
-      return [];
-    }
-
-    // Coletar os IDs de movimentação para pegar o telefone na tabela GERAL
-    const movimentacoesIds = itensEncontrados.map(i => i.movimentacao);
-
-    // 2. Buscar Telefones na Vendas Geral
-    const { data: vendasGerais, error: erroGeral } = await supabase
+    const idsMovimentacao = itensVendidos.map(i => i.movimentacao);
+    const { data: vendasGerais } = await supabase
       .from('gemini_vendas_geral')
-      .select('movimentacao, nome, telefone, total_venda')
-      .in('movimentacao', movimentacoesIds);
+      .select('movimentacao, nome, telefone, total_venda, data')
+      .in('movimentacao', idsMovimentacao);
 
-    if (erroGeral) throw erroGeral;
-
-    // 3. Cruzar dados e montar resultado
     const resultadoMap = new Map<string, SalesSniperMatch>();
-
     vendasGerais?.forEach(venda => {
-      // Validar se tem telefone
-      if (!venda.telefone || venda.telefone.length < 8) return;
-
+      if (!venda.telefone || venda.telefone.length < 8 || (venda.total_venda || 0) < 0) return;
       if (!resultadoMap.has(venda.telefone)) {
         resultadoMap.set(venda.telefone, {
           cliente: { nome: venda.nome || "Cliente", telefone: venda.telefone },
-          motivo: `Comprou tamanho ${tamanho} recentemente`,
-          ultimaCompraData: itensEncontrados.find(i => i.movimentacao === venda.movimentacao)?.data || new Date().toISOString(),
+          motivo: `Comprou ${marca} (${genero}) Tam ${tamanho}`,
+          ultimaCompraData: venda.data,
           totalGastoHistorico: venda.total_venda
         });
+      } else {
+          const existing = resultadoMap.get(venda.telefone)!;
+          if (new Date(venda.data) > new Date(existing.ultimaCompraData)) existing.ultimaCompraData = venda.data;
       }
     });
 
-    console.log(`✅ Sniper encontrou ${resultadoMap.size} clientes.`);
-    return Array.from(resultadoMap.values());
-
+    return Array.from(resultadoMap.values()).sort((a, b) => new Date(b.ultimaCompraData).getTime() - new Date(a.ultimaCompraData).getTime());
   } catch (err) {
-    console.error("❌ Erro Crítico Sniper:", err);
+    console.error("Erro Sniper:", err);
+    return [];
+  }
+};
+
+// --- 4. ANÁLISE DE ESTOQUE E GIRO (NOVO) ---
+export const getInventoryAnalytics = async (): Promise<InventoryAnalytics[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('gemini_vw_analise_giro')
+      .select('*')
+      .order('vendas_valor_90d', { ascending: false });
+
+    if (error) {
+      console.error("Erro Analytics Estoque:", error);
+      return [];
+    }
+
+    // LÓGICA DE INTELIGÊNCIA COMERCIAL
+    return (data || []).map((item: any) => {
+      const estoque = item.qtd_estoque_atual || 0;
+      const vendas90d = item.vendas_qtd_90d || 0;
+      
+      // Cálculo de Cobertura: Quantos dias o estoque dura nesse ritmo?
+      // Média diária = Vendas 90 dias / 90
+      const vendasPorDia = vendas90d / 90;
+      
+      // Se não vende nada, cobertura é "infinita" (999 dias)
+      const diasDeCobertura = vendasPorDia > 0 ? Math.round(estoque / vendasPorDia) : 999;
+
+      let sugestao: 'COMPRAR' | 'LIQUIDAR' | 'MANTER' = 'MANTER';
+
+      // REGRAS DO ALGORITMO:
+      if (estoque > 20 && diasDeCobertura > 120) {
+        // Ex: Tenho 50 peças e vou levar 4 meses pra vender -> LIQUIDAR
+        sugestao = 'LIQUIDAR';
+      } else if (estoque < 10 && diasDeCobertura < 30) {
+        // Ex: Tenho 5 peças e acaba em 20 dias -> COMPRAR
+        sugestao = 'COMPRAR';
+      }
+
+      return {
+        ...item,
+        sugestao,
+        cobertura_dias: diasDeCobertura
+      };
+    });
+
+  } catch (e) {
+    console.error("Erro Analytics:", e);
+    return [];
+  }
+};
+
+// --- 5. CORREÇÃO: ANÁLISE DE CHURN (CLIENTES SUMIDOS) ---
+export const getRankingClientes = async (): Promise<RankingCliente[]> => {
+  console.log("🔄 Carregando Ranking de Clientes (Churn)...");
+  try {
+    // Reutiliza a view de carteira que já contém os dados essenciais
+    // Isso evita criar uma nova view no banco se a 'gemini_vw_relatorio_churn' não existir
+    const { data, error } = await supabase
+      .from('gemini_vw_relatorio_carteira_clientes')
+      .select('*');
+
+    if (error) {
+      console.error("Erro ao buscar dados para Churn:", error);
+      return [];
+    }
+
+    // Processamento no Frontend para calcular dias sem comprar
+    return (data || []).map((cliente: any) => {
+      const ultimaCompra = new Date(cliente.data_ultima_compra);
+      const hoje = new Date();
+      
+      // Cálculo da diferença em dias
+      const diffTime = Math.abs(hoje.getTime() - ultimaCompra.getTime());
+      const diasSemComprar = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+      return {
+        cliente_nome: cliente.cliente || "Cliente Desconhecido",
+        telefone: cliente.telefone || "",
+        total_gasto: cliente.total_gasto_acumulado || 0,
+        ultima_compra: cliente.data_ultima_compra,
+        dias_sem_comprar: diasSemComprar
+      };
+    });
+  } catch (e) {
+    console.error("Erro inesperado no Churn:", e);
     return [];
   }
 };

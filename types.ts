@@ -1,3 +1,6 @@
+// src/types.ts
+
+// Tabelas Base
 export interface Cliente {
   id: number;
   nome: string;
@@ -11,13 +14,17 @@ export interface Produto {
   sku: string;
   nome_produto: string;
   categoria_produto: string;
+  departamento: string;
   marca: string;
   tamanho: string;
   cor: string;
   genero: string;
   valor_venda: number;
   quantidade_estoque: number;
+  data_criacao?: string;
 }
+
+// --- VIEWS ANALÍTICAS ---
 
 export interface AnalyticsCategoria {
   categoria_produto: string;
@@ -35,12 +42,6 @@ export interface SalesEvolutionData {
   tipo_operacao: string;
 }
 
-export interface AnaliseMensalFiltro {
-  inicio?: string; // YYYY-MM ou data ISO
-  fim?: string; // YYYY-MM ou data ISO
-  tipo_operacao?: string;
-}
-
 export interface CarteiraCliente {
   cliente: string;
   vendedor_responsavel: string;
@@ -50,6 +51,7 @@ export interface CarteiraCliente {
   qtd_vendas: number;
   data_ultima_compra: string;
   ultimas_preferencias: string;
+  telefone?: string; // Adicionado para garantir compatibilidade
 }
 
 export interface SalesSniperMatch {
@@ -62,74 +64,29 @@ export interface SalesSniperMatch {
   totalGastoHistorico: number;
 }
 
+// --- NOVO: ANÁLISE DE GIRO DE ESTOQUE ---
+export interface InventoryAnalytics {
+  marca: string;
+  genero: string;
+  departamento: string;
+  total_skus: number;
+  qtd_estoque_atual: number;
+  valor_estoque_custo: number;
+  valor_estoque_venda: number;
+  qtd_chegou_90d: number;
+  vendas_qtd_30d: number;
+  vendas_qtd_90d: number;
+  vendas_valor_90d: number;
+  // Campos calculados no Front-end
+  sugestao?: 'COMPRAR' | 'LIQUIDAR' | 'MANTER';
+  cobertura_dias?: number;
+}
+
+// --- CORREÇÃO: ANÁLISE DE CHURN ---
 export interface RankingCliente {
   cliente_nome: string;
   telefone: string;
-  dias_sem_comprar: number;
   total_gasto: number;
   ultima_compra: string;
-}
-
-export interface AnalyticsFiltro {
-  categoria?: string;
-  minFaturamento?: number;
-  minLucro?: number;
-  limit?: number;
-}
-
-export interface CarteiraFiltro {
-  vendedor?: string;
-  cliente?: string;
-  cidade?: string;
-  minTotalGasto?: number;
-}
-
-export interface ClienteFiltro {
-  nome?: string;
-  cidade?: string;
-  uf?: string;
-}
-
-export interface ProdutoFiltro {
-  categoria?: string;
-  marca?: string;
-  tamanho?: string;
-  genero?: string;
-  estoqueMenorQue?: number;
-  buscaNome?: string;
-}
-
-export interface VendaItem {
-  sku: string;
-  movimentacao: string;
-  quantidade: number;
-  valor_venda: number;
-  data: string;
-  nome: string;
-  vendedor: string;
-}
-
-export interface VendaGeral {
-  movimentacao: string;
-  tipo_operacao: string;
-  total_venda: number;
-  nome?: string;
-  telefone?: string;
-}
-
-export interface VendaItemFiltro {
-  vendedor?: string;
-  sku?: string;
-  movimentacao?: string;
-  dataDe?: string;
-  dataAte?: string;
-  cliente?: string;
-}
-
-export interface VendaGeralFiltro {
-  movimentacao?: string;
-  tipo_operacao?: string;
-  totalVendaMin?: number;
-  totalVendaMax?: number;
-  nome?: string;
+  dias_sem_comprar: number;
 }
